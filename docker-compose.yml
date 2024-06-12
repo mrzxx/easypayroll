@@ -1,0 +1,71 @@
+version: '4.0'
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_DB: payroll_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    environment:
+      DB_VENDOR: postgres
+      DB_ADDR: postgres
+      DB_DATABASE: payroll_db
+      DB_USER: user
+      DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    command: ["start-dev"]
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+
+  companyservice:
+    build:
+      context: ./CompanyService
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payroll_db
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8081:8080"
+
+  payrollservice:
+    build:
+      context: ./PayrollService
+    depends_on:
+      - postgres
+      - companyservice
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payroll_db
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8082:8080"
+
+  api-gateway:
+    build:
+      context: ./Api-Gateway
+    depends_on:
+      - keycloak
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "9000:9000"
+
+volumes:
+  postgres_data:
+  keycloak_data:
